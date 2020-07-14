@@ -31,7 +31,7 @@ fn main() {
                 .long("output")
                 .help("Output file")
                 .takes_value(true)
-                .required("info"),
+                .required(true),
         )
         .get_matches();
 
