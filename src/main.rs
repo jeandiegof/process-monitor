@@ -70,14 +70,7 @@ fn main() {
         let time = Local::now().time().format("%H:%M:%S%.3f").to_string();
         let temperature: Degrees = psutil::sensors::temperatures()
             .iter()
-            .find(|temperature| {
-                temperature
-                    .as_ref()
-                    .unwrap()
-                    .label()
-                    .and_then(|label| Some(label.contains("Package")))
-                    .unwrap_or(false)
-            })
+            .find(|temperature| temperature.as_ref().unwrap().unit().contains("cpu-thermal"))
             .map(|temperature| temperature.as_ref().unwrap().current().clone().celsius())
             .unwrap();
 
