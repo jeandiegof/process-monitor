@@ -2,6 +2,8 @@ use chrono::Local;
 use clap::{value_t, App, Arg};
 use csv::WriterBuilder;
 use psutil::process::Process;
+use psutil::Degrees;
+use rand::Rng;
 use std::fs::OpenOptions;
 use std::path::Path;
 
@@ -52,7 +54,13 @@ fn main() {
         .from_writer(file);
 
     writer
-        .write_record(&["date", "time", "ram_percent", "cpu_percent"])
+        .write_record(&[
+            "date",
+            "time",
+            "ram_percent",
+            "cpu_percent",
+            "package_temperature",
+        ])
         .unwrap();
 
     loop {
@@ -60,13 +68,35 @@ fn main() {
         let cpu = process.cpu_percent().unwrap();
         let date = Local::now().date().format("%Y-%m-%d").to_string();
         let time = Local::now().time().format("%H:%M:%S%.3f").to_string();
+        let temperature: Degrees = psutil::sensors::temperatures()
+            .iter()
+            .find(|temperature| {
+                temperature
+                    .as_ref()
+                    .unwrap()
+                    .label()
+                    .and_then(|label| Some(label.contains("Package")))
+                    .unwrap_or(false)
+            })
+            .map(|temperature| temperature.as_ref().unwrap().current().clone().celsius())
+            .unwrap();
 
-        println!("RAM: {:>4}%\t\tCPU: {:>4}%", ram, cpu);
+        println!(
+            "RAM: {:>4}%\t\tCPU: {:>4}%\t\tTemperature: {}",
+            ram, cpu, temperature
+        );
         writer
-            .write_record(&[date, time, ram.to_string(), cpu.to_string()])
+            .write_record(&[
+                date,
+                time,
+                ram.to_string(),
+                cpu.to_string(),
+                temperature.to_string(),
+            ])
             .unwrap();
         writer.flush().unwrap();
 
-        std::thread::sleep(std::time::Duration::from_millis(interval_ms));
+        let interval = rand::thread_rng().gen_range(150, 1000);
+        std::thread::sleep(std::time::Duration::from_millis(interval));
     }
 }
