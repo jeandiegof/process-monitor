@@ -9,3 +9,5 @@ edition = "2018"
 [dependencies]
 psutil = "3.1.0"
 clap = "2.33.1"
+csv = "1.1.3"
+chrono = "0.4.13"

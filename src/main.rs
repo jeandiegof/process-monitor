@@ -1,5 +1,9 @@
+use chrono::Local;
 use clap::{value_t, App, Arg};
+use csv::WriterBuilder;
 use psutil::process::Process;
+use std::fs::OpenOptions;
+use std::path::Path;
 
 fn main() {
     let matches = App::new(env!("CARGO_PKG_NAME"))
@@ -22,29 +26,47 @@ fn main() {
                 .required(true),
         )
         .arg(
-            Arg::with_name("verbosity")
-                .short("v")
-                .long("log")
-                .help("Log level")
+            Arg::with_name("output")
+                .short("o")
+                .long("output")
+                .help("Output file")
                 .takes_value(true)
-                .possible_values(&["trace", "debug", "info", "warn", "error"])
-                .case_insensitive(true)
-                .default_value("info"),
+                .required("info"),
         )
         .get_matches();
 
     let pid = value_t!(matches.value_of("pid"), u32).unwrap();
-    let interval = value_t!(matches.value_of("interval"), u64).unwrap();
-    let verbosity = matches.value_of("verbosity").unwrap();
+    let interval_ms = value_t!(matches.value_of("interval"), u64).unwrap();
+    let output = matches.value_of("output").unwrap();
 
     let mut process = Process::new(pid).unwrap();
 
+    let file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(Path::new(output))
+        .unwrap();
+
+    let mut writer = WriterBuilder::new()
+        .has_headers(file.metadata().unwrap().len() == 0)
+        .from_writer(file);
+
+    writer
+        .write_record(&["date", "time", "ram_percent", "cpu_percent"])
+        .unwrap();
+
     loop {
-        println!(
-            "RAM: {:>4}%\tCPU: {:>4}%",
-            process.memory_percent().unwrap(),
-            process.cpu_percent().unwrap()
-        );
-        std::thread::sleep(std::time::Duration::from_millis(interval));
+        let ram = process.memory_percent().unwrap();
+        let cpu = process.cpu_percent().unwrap();
+        let date = Local::now().date().format("%Y-%m-%d").to_string();
+        let time = Local::now().time().format("%H:%M:%S%.3f").to_string();
+
+        println!("RAM: {:>4}%\t\tCPU: {:>4}%", ram, cpu);
+        writer
+            .write_record(&[date, time, ram.to_string(), cpu.to_string()])
+            .unwrap();
+        writer.flush().unwrap();
+
+        std::thread::sleep(std::time::Duration::from_millis(interval_ms));
     }
 }
